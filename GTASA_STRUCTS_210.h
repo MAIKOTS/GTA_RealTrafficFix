@@ -1,49 +1,16 @@
-// ============================================================================
-// GTASA_STRUCTS_210.h
-// ----------------------- -----------------------------------------------------
-// Minimal compatible struct header for GTA:SA Android libGTASA.so v2.10
-// (64-bit / arm64-v8a build, AML64 path — the #else branch in ES3Shader.h).
-//
-// IMPORTANT:
-// Same disclaimer as GTASA_STRUCTS.h: this is NOT the original/official
-// header used internally by the AndroidModLoader team. It's a hand-built,
-// minimal-compatible shim containing ONLY the symbols SAShaderL actually
-// references, so the 64-bit (AArch64) build target can compile.
-//
-// Differences vs the 32-bit version (GTASA_STRUCTS.h):
-//  - All pointers are 8 bytes (native arm64), so padding/offsets after any
-//    pointer field shift accordingly.
-//  - Bitfields packed into a 32-bit word keep the same bit layout as 32-bit
-//    (RW/GTA:SA didn't widen these on the 64-bit port), but the alignment
-//    padding around them can differ due to 8-byte pointer alignment rules.
-//
-// As with the 32-bit shim: if you obtain the real GTASA_STRUCTS_210.h,
-// replace this file entirely. The offsets/padding here are placeholders
-// sized to "compile and be roughly position-correct for the fields
-// SAShaderL touches" — they have NOT been independently verified against
-// the 64-bit v2.10 binary the way your CFont::RenderString / CCamera::Process
-// function offsets have been. Re-validate m_pRwCamera / farClip / m_nType /
-// m_nModelIndex offsets with radare2/Ghidra on the arm64 .so before trusting
-// them for anything beyond "it compiles".
-// ============================================================================
-
 #ifndef _GTASA_STRUCTS_210_H
 #define _GTASA_STRUCTS_210_H
 
 #include <stdint.h>
 
-// ----------------------------------------------------------------------------
-// Basic math types (RenderWare / GTA:SA convention) — identical to 32-bit,
-// these are plain floats with no pointer-size dependency.
-// ----------------------------------------------------------------------------
-
 class CVector
 {
 public:
     float x, y, z;
-
     CVector() : x(0.0f), y(0.0f), z(0.0f) {}
     CVector(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+    
+    float Magnitude() const { return 0.0f; }
 };
 
 class CVector2D
@@ -58,151 +25,145 @@ public:
     uint8_t r, g, b, a;
 };
 
-// ----------------------------------------------------------------------------
-// RwCamera, 64-bit layout.
-//
-// CONFIRMED via radare2 disassembly (arm64, v2.10) of two independent
-// functions, cross-checked against each other:
-//
-// (1) CCamera::SetRwCamera(RwCamera*):
-//       str x1, [x19, 0x930]   ; this->m_pRwCamera = pRwCamera
-//       add x1, x1, 0x40       ; pRwCamera + 0x40 -> RwMatrixTag* used by
-//                              ; CMatrix::Attach(RwMatrixTag*, bool)
-//     => RwCamera+0x40 leads into the camera's frame/matrix block.
-//
-// (2) CCamera::Process(), right after calling RwCameraSetFarClipPlane:
-//       bl   RwCameraSetFarClipPlane(RwCamera*, float)
-//       ldr  x8, [x19, 0x930]        ; reload this->m_pRwCamera (CONFIRMS
-//                                    ; the 0x930 offset again, independently)
-//       ldp  w9, w8, [x8, 0xa8]      ; load TWO adjacent 32-bit floats from
-//                                    ; RwCamera+0xa8 and RwCamera+0xac
-//       str  w9, [x10]               ; -> CDraw::ms_fNearClipZ
-//       str  w8, [x9]                ; -> CDraw::ms_fFarClipZ
-//
-//     Since these are read immediately after RwCameraSetFarClipPlane/
-//     RwCameraSetNearClipPlane calls earlier in the same function, and an
-//     `ldp` always loads two CONSECUTIVE 32-bit slots, this gives us exact,
-//     directly-observed offsets:
-//
-//         RwCamera::nearClip  @ offset 0xa8  <-- CONFIRMED
-//         RwCamera::farClip   @ offset 0xac  <-- CONFIRMED
-//
-// This is exactly what TheCamera->m_pRwCamera->farClip in
-// SAShaderL/main.cpp (FarClipDist uniform) resolves to.
-// ----------------------------------------------------------------------------
-struct RwCamera
-{
-    uint8_t  _pad0[0xa8];     // CONFIRMED size: RwObject header, frame/matrix
-                               // block (matrix tag at +0x40), viewport state,
-                               // everything up to nearClip — none of these
-                               // intermediate fields are touched by SAShaderL
-    float    nearClip;        // CONFIRMED offset 0xa8
-    float    farClip;         // CONFIRMED offset 0xac
-    uint8_t  _pad1[0x50];     // remaining camera fields (placeholder size,
-                               // not needed by SAShaderL)
-};
-
-// ----------------------------------------------------------------------------
-// CCamera — only m_pRwCamera is consumed by SAShaderL.
-//
-// CONFIRMED via radare2 disassembly (arm64, v2.10) of
-// CCamera::SetRwCamera(RwCamera*):
-//
-//   mov x19, x0            ; x19 = this
-//   str x1, [x19, 0x930]   ; this->m_pRwCamera = pRwCamera   <-- CONFIRMED
-//   ...
-//   ldr x0, [x19, 0x930]   ; reload for return value
-//
-// So m_pRwCamera sits at offset 0x930 in CCamera on this binary. CCamera is
-// a genuinely huge class in GTA:SA (camera modes, shake state, splines,
-// cutscene data, etc.) so this large offset is expected and not a sign of
-// a wrong layout — it matches what TheCamera->m_pRwCamera->farClip in
-// SAShaderL/main.cpp needs to resolve to.
-// ----------------------------------------------------------------------------
-class CCamera
+class CMatrix
 {
 public:
-    uint8_t   _pad0[0x930];  // CONFIRMED size: everything before m_pRwCamera
-                               // (camera modes, shake, splines, etc. — opaque
-                               //  padding, none of these fields are touched
-                               //  by SAShaderL)
-    RwCamera* m_pRwCamera;     // CONFIRMED offset 0x930 (8-byte pointer)
-    uint8_t   _pad1[0x100];   // remainder of CCamera after m_pRwCamera —
-                               // size unverified, generous placeholder
-};
-
-// ----------------------------------------------------------------------------
-// CEntity — only the type & model index fields are needed.
-// vtable + m_rwObject are now 8 bytes each (was 4+4 on 32-bit), which shifts
-// the bitfield word and everything after it by +8 bytes relative to 32-bit.
-// ----------------------------------------------------------------------------
-enum eEntityType : uint8_t
-{
-    ENTITY_TYPE_NOTHING  = 0,
-    ENTITY_TYPE_BUILDING = 1,
-    ENTITY_TYPE_VEHICLE  = 2,
-    ENTITY_TYPE_PED      = 3,
-    ENTITY_TYPE_OBJECT   = 4,
-    ENTITY_TYPE_DUMMY    = 5,
+    CVector pos;
+    CVector GetRight() { return CVector(1,0,0); }
+    CVector GetForward() { return CVector(0,1,0); }
+    CVector GetUp() { return CVector(0,0,1); }
 };
 
 class CEntity
 {
 public:
-    void*    vtable;          // 0x00 vtable ptr (8 bytes on arm64)
-    void*    m_rwObject;      // 0x08 RpAtomic/RpClump* (8 bytes on arm64)
-
-    // --- bitfield word: contains m_nType among others (same bit layout
-    //     as 32-bit; just located 4 bytes later due to pointer widening) ---
-    uint32_t m_nType      : 3; // entity type (eEntityType)
+    void*    vtable;
+    void*    m_rwObject;
+    uint32_t m_nType      : 3;
     uint32_t m_nStatus     : 5;
-    uint32_t m_bUsesCollision : 1;
-    uint32_t m_bCollisionProcessed : 1;
-    uint32_t m_bIsStatic   : 1;
-    uint32_t m_bHasContacted : 1;
-    uint32_t m_bPedPhysics : 1;
-    uint32_t m_bIsStuck    : 1;
-    uint32_t m_bIsInSafePosition : 1;
-    uint32_t m_bWasPostponed : 1;
-    uint32_t m_bExplosionProof : 1;
-    uint32_t m_bIsVisible  : 1;
-    uint32_t m_bHasCollided : 1;
-    uint32_t m_bRenderDamaged : 1;
-    uint32_t m_bBulletProof : 1;
-    uint32_t m_bFireProof   : 1;
-    uint32_t m_bCollisionProof : 1;
-    uint32_t m_bMeleeProof  : 1;
-    uint32_t m_bOnlyDamagedByPlayer : 1;
-    uint32_t m_bStreamingDontDelete : 1;
-    uint32_t m_bZoneCulled  : 1;
-    uint32_t m_bZoneCulled2 : 1;
-    uint32_t m_bRemoveFromWorld : 1;
-    uint32_t m_bHasHitWall  : 1;
-    uint32_t m_bImBeingRendered : 1;
-    uint32_t m_bDrawLast    : 1;
-    uint32_t m_bDistanceFade : 1;
-
-    uint8_t  _pad0[0x18];      // matrix handle / reference / lod fields...
-                                // (wider padding to keep model index roughly
-                                //  aligned with the real 64-bit layout)
-
-    int16_t  m_nModelIndex;    // model index (-1 if none)
+    uint8_t  _pad0[0x18];
+    int16_t  m_nModelIndex;
     int16_t  _pad1;
+    CMatrix* m_matrix;
 
-    uint8_t  _pad2[0x48];      // remainder of CEntity (PADDING ONLY)
+    CVector GetPosition() { return m_matrix ? m_matrix->pos : CVector(); }
 };
 
-// ----------------------------------------------------------------------------
-// ES2Shader — base class of ES3Shader (see ES3Shader.h in this repo).
-// Same role as the 32-bit version; padding widened slightly to account for
-// any internal pointer fields being 8 bytes on arm64.
-// ----------------------------------------------------------------------------
+class CColModel
+{
+public:
+    struct {
+        CVector m_vecMin;
+        CVector m_vecMax;
+    } m_boxBound;
+};
+
+class CColPoint
+{
+public:
+    CVector m_vecPoint;
+};
+
+class CPed : public CEntity
+{
+public:
+    bool IsPlayer() { return false; }
+};
+
+class CPlayerPed : public CPed
+{
+public:
+    class CVehicle* m_pVehicle;
+};
+
+class CVehicle : public CEntity
+{
+public:
+    CPed* m_pDriver;
+    uint8_t m_nCreateBy;
+    uint8_t m_nVehicleSubType;
+    float m_fMovingSpeed;
+    CVector m_vecMoveSpeed;
+    float m_fSteerAngle;
+    int m_nCurrentGear;
+    float m_fGasPedal;
+    
+    struct {
+        uint8_t bSirenOrAlarm : 1;
+        uint8_t bParking : 1;
+        uint8_t bIsBig : 1;
+        uint8_t bIsBus : 1;
+        uint8_t bIsLawEnforcer : 1;
+        uint8_t bIsAmbulanceOnDuty : 1;
+        uint8_t bIsFireTruckOnDuty : 1;
+    } vehicleFlags;
+
+    struct {
+        uint8_t CruiseSpeed;
+        uint8_t DrivingMode;
+        int NewLane;
+        int OldLane;
+        bool bAlwaysInSlowLane;
+        CEntity* pTargetEntity;
+    } m_AutoPilot;
+
+    void* m_pHandling;
+
+    int GetNumContactWheels() { return 4; }
+    void Teleport(CVector pos) {}
+};
+
+class CAutomobile : public CVehicle {};
+class CBike : public CVehicle {};
+class CHeli : public CVehicle {};
+class CPlane : public CVehicle {};
+class CQuad : public CVehicle {};
+
+class CObject : public CEntity {};
+class CCutsceneObject : public CObject {};
+
+template <typename T, typename T2 = void>
+class CPool
+{
+public:
+    char* _pad0;
+    T* m_pObjects;
+    int m_nSize;
+    int m_nFirstFree;
+    struct {
+        uint8_t bEmpty : 1;
+    } *m_byteMap;
+
+    T* GetAt(int index) { return &m_pObjects[index]; }
+    int GetIndex(T* obj) { return 0; }
+};
+
+struct RwCamera
+{
+    uint8_t  _pad0[0xa8];
+    float    nearClip;
+    float    farClip;
+    uint8_t  _pad1[0x50];
+};
+
+class CCamera
+{
+public:
+    uint8_t   _pad0[0x930];
+    RwCamera* m_pRwCamera;
+    uint8_t   _pad1[0x100];
+    
+    CVector GetPosition() { return CVector(); }
+};
+
 class ES2Shader
 {
 public:
-    int      nShaderId;     // GL program object ID (glCreateProgram result)
-    uint32_t flags;         // shader flags bitmask (FLAG_ALPHA_TEST, etc.)
-    uint8_t  _pad0[0x48];   // remaining engine-internal shader bookkeeping
+    int      nShaderId;
+    uint32_t flags;
+    uint8_t  _pad0[0x48];
 };
+
+float DistanceBetweenPoints(const CVector& v1, const CVector& v2);
 
 #endif // _GTASA_STRUCTS_210_H
