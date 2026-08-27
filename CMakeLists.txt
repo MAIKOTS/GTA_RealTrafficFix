@@ -21,7 +21,9 @@ add_library(${LOCAL_MODULE_NAME} SHARED
 
 # Diretórios de include (equivalente ao LOCAL_C_INCLUDES)
 target_include_directories(${LOCAL_MODULE_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/mod
 )
 
 # Definições de compilação (-DNDEBUG)
