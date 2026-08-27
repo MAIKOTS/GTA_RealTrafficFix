@@ -36,6 +36,14 @@ enum eDrivingStyle
     DRIVING_STYLE_AVOID_CARS_STOP_FOR_PEDS_OBEY_LIGHTS = 4
 };
 
+struct tTransmissionData {
+    float m_fMaxVelocity;
+};
+
+struct tHandlingData {
+    tTransmissionData Transmission;
+};
+
 class CVector
 {
 public:
@@ -43,9 +51,14 @@ public:
     CVector() : x(0.0f), y(0.0f), z(0.0f) {}
     CVector(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
     
+    CVector operator+(const CVector& v) const {
+        return CVector(x + v.x, y + v.y, z + v.z);
+    }
+
     CVector operator-(const CVector& v) const {
         return CVector(x - v.x, y - v.y, z - v.z);
     }
+    
     float Magnitude() const { return 0.0f; }
 };
 
@@ -143,7 +156,7 @@ public:
         CEntity* pTargetEntity;
     } m_AutoPilot;
 
-    void* m_pHandling;
+    tHandlingData* m_pHandling;
 
     int GetNumContactWheels() { return 4; }
     void Teleport(CVector pos) {}
@@ -176,6 +189,10 @@ public:
     }
 
     T* GetAt(int index) { return &m_pObjects[index]; }
+    
+    int GetIndex(T* obj) {
+        return (int)(obj - m_pObjects);
+    }
 };
 
 struct RwCamera
