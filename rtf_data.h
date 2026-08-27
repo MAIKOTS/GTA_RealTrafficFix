@@ -12,6 +12,15 @@ public:
         bool bFoundBump;
     } flags;
 
+    ExtendedVehicleData()
+    {
+        framesDelayCountSearchBump = 0;
+        freeLineTimer = 0.0f;
+        flags.bPhysics = false;
+        flags.bRunGroundStuckFix = true;
+        flags.bFoundBump = false;
+    }
+
     inline void Reset()
     {
         framesDelayCountSearchBump = 0;
