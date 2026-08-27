@@ -1,11 +1,12 @@
 // ============================================================================
-// GTASA_STRUCTS_210.h (Ajustado)
+// GTASA_STRUCTS_210.h (Ajustado com DistanceBetweenPoints inline)
 // ============================================================================
 
 #ifndef _GTASA_STRUCTS_210_H
 #define _GTASA_STRUCTS_210_H
 
 #include <stdint.h>
+#include <cmath>
 
 enum eVehicleCreatedBy
 {
@@ -59,7 +60,9 @@ public:
         return CVector(x - v.x, y - v.y, z - v.z);
     }
     
-    float Magnitude() const { return 0.0f; }
+    float Magnitude() const { 
+        return std::sqrt(x * x + y * y + z * z); 
+    }
 };
 
 class CVector2D
@@ -221,6 +224,12 @@ public:
     uint8_t  _pad0[0x48];
 };
 
-float DistanceBetweenPoints(const CVector& v1, const CVector& v2);
+inline float DistanceBetweenPoints(const CVector& v1, const CVector& v2)
+{
+    float dx = v1.x - v2.x;
+    float dy = v1.y - v2.y;
+    float dz = v1.z - v2.z;
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
 
 #endif // _GTASA_STRUCTS_210_H
