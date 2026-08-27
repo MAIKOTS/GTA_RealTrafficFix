@@ -419,6 +419,8 @@ DECL_HOOKv(VehicleDestroy, CVehicle* self)
 uintptr_t VehicleChangesLane_BackTo, SetNewCarLane_BackTo;
 extern "C" int VehicleChangesLane_Patch(CVehicle* vehicle)
 {
+    if (!vehicle) return 0;
+    
     auto player = FindPlayerPed(-1);
     CVehicle* playerVehicle;
     if(player && (playerVehicle = player->m_pVehicle))
@@ -438,6 +440,11 @@ extern "C" int VehicleChangesLane_Patch(CVehicle* vehicle)
 }
 extern "C" void SetNewCarLane_Patch(CVehicle* vehicle, int magicValue)
 {
+    if (!vehicle || !vehicle->m_pHandling || magicValue <= 0)
+    {
+        return;
+    }
+    
     if((vehicle->vehicleFlags.bIsBig || vehicle->vehicleFlags.bIsBus || vehicle->m_pHandling->Transmission.m_fMaxVelocity < 0.62f) &&
        (!vehicle->vehicleFlags.bIsLawEnforcer && !vehicle->vehicleFlags.bIsAmbulanceOnDuty && !vehicle->vehicleFlags.bIsFireTruckOnDuty))
     {
