@@ -13,8 +13,8 @@ jobs:
       matrix:
         abi: [armeabi-v7a, arm64-v8a]
     env:
-      ANDROID_NDK_VERSION: '25.2.9519653'   # ajuste se desejar outra versão
-      API_LEVEL: '21'                       # mínimo Android API level
+      ANDROID_NDK_VERSION: '25.2.9519653'
+      API_LEVEL: '21'
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +50,6 @@ jobs:
 
       - name: Configure CMake for Android (${{ matrix.abi }})
         run: |
-          # Detect NDK directory (prefer ANDROID_NDK_ROOT/ANDROID_NDK_HOME, fallback to ANDROID_SDK_ROOT/ndk/<version>)
           if [ -n "${ANDROID_NDK_ROOT:-}" ]; then
             NDK_DIR="${ANDROID_NDK_ROOT}"
           elif [ -n "${ANDROID_NDK_HOME:-}" ]; then
@@ -58,18 +57,12 @@ jobs:
           elif [ -d "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" ]; then
             NDK_DIR="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
           else
-            echo "ERROR: NDK not found. Checked ANDROID_NDK_ROOT, ANDROID_NDK_HOME and ${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
-            ls -la "${ANDROID_SDK_ROOT}/ndk" || true
+            echo "ERROR: NDK not found."
             exit 1
           fi
 
           echo "Using NDK_DIR=${NDK_DIR}"
           TOOLCHAIN_FILE="${NDK_DIR}/build/cmake/android.toolchain.cmake"
-          if [ ! -f "${TOOLCHAIN_FILE}" ]; then
-            echo "ERROR: toolchain file not found at ${TOOLCHAIN_FILE}"
-            ls -la "${NDK_DIR}/build/cmake" || true
-            exit 1
-          fi
 
           cmake -S . -B build/${{ matrix.abi }} \
             -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
@@ -84,16 +77,5 @@ jobs:
       - name: Upload .so artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RealTraficFix-${{ matrix.abi }}
-          path: build/${{ matrix.abi }}/**/*.so            -DANDROID_PLATFORM=android-${API_LEVEL} \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DANDROID_STL=c++_static
-
-      - name: Build
-        run: cmake --build build/${{ matrix.abi }} --config Release -- -j
-
-      - name: Upload .so artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libFastBoot-${{ matrix.abi }}
+          name: RealTrafficFix-${{ matrix.abi }}
           path: build/${{ matrix.abi }}/**/*.so
