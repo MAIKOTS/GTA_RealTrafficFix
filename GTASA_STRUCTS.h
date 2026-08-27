@@ -1,7 +1,40 @@
+// ============================================================================
+// GTASA_STRUCTS.h (Ajustado)
+// ============================================================================
+
 #ifndef _GTASA_STRUCTS_H
 #define _GTASA_STRUCTS_H
 
 #include <stdint.h>
+
+enum eVehicleCreatedBy
+{
+    RANDOM_VEHICLE = 1,
+    MISSION_VEHICLE = 2,
+    PARKED_VEHICLE = 3
+};
+
+enum eVehicleType
+{
+    VEHICLE_TYPE_AUTOMOBILE = 0,
+    VEHICLE_TYPE_MTRUCK = 1,
+    VEHICLE_TYPE_QUAD = 2,
+    VEHICLE_TYPE_HELI = 3,
+    VEHICLE_TYPE_BOAT = 4,
+    VEHICLE_TYPE_PLANE = 5,
+    VEHICLE_TYPE_BIKE = 6,
+    VEHICLE_TYPE_BMX = 7,
+    VEHICLE_TYPE_TRAILER = 8
+};
+
+enum eDrivingStyle
+{
+    DRIVING_STYLE_STOP_FOR_CARS = 0,
+    DRIVING_STYLE_AVOID_CARS = 1,
+    DRIVING_STYLE_PLOUGH_THROUGH = 2,
+    DRIVING_STYLE_STOP_FOR_CARS_IGNORE_LIGHTS = 3,
+    DRIVING_STYLE_AVOID_CARS_STOP_FOR_PEDS_OBEY_LIGHTS = 4
+};
 
 class CVector
 {
@@ -10,7 +43,10 @@ public:
     CVector() : x(0.0f), y(0.0f), z(0.0f) {}
     CVector(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
     
-    float Magnitude() const { return 0.0f; } // Placeholder ou cálculo real se necessário
+    CVector operator-(const CVector& v) const {
+        return CVector(x - v.x, y - v.y, z - v.z);
+    }
+    float Magnitude() const { return 0.0f; }
 };
 
 class CVector2D
@@ -134,8 +170,12 @@ public:
         uint8_t bEmpty : 1;
     } *m_byteMap;
 
+    CPool(int size, const char* name) {
+        m_nSize = size;
+        m_pObjects = new T[size];
+    }
+
     T* GetAt(int index) { return &m_pObjects[index]; }
-    int GetIndex(T* obj) { return 0; }
 };
 
 struct RwCamera
@@ -152,6 +192,14 @@ public:
     RwCamera* m_pRwCamera;
     
     CVector GetPosition() { return CVector(); }
+};
+
+class ES2Shader
+{
+public:
+    int      nShaderId;
+    uint32_t flags;
+    uint8_t  _pad0[0x40];
 };
 
 float DistanceBetweenPoints(const CVector& v1, const CVector& v2);
